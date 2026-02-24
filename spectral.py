@@ -7,14 +7,25 @@ import geopandas as gpd
 import json
 import ee
 import geemap
+import os
 
 def get_spectral(
         country_code: str,
-        city: str):
+        city: str,
+        date: tuple):
+    
+    spectral_path = f"data/{country_code}_spectral_features.csv"
+    
+    if os.path.exists(spectral_path):
+        print(f"Data has already been processed at {spectral_path}.\n")
+        return
 
     country = gpd.read_file(f"data/shapefiles/gadm41_{country_code}_2.shp")
 
-    city = country[country["NAME_1"] == city]
+    if country_code != "FIN":
+        city = country[country["NAME_1"] == city]
+    else:
+        city = country[country["NAME_2"] == city]
 
     city_geom = city.unary_union
 
@@ -30,7 +41,7 @@ def get_spectral(
     image = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
         .filterBounds(city_aoi)
-        .filterDate("2022-01-01", "2022-12-31") # Make this dynamic
+        .filterDate(date[0], date[1]) # Make this dynamic
         .median()
         .clip(city_aoi)
     )
@@ -64,7 +75,7 @@ def get_spectral(
         },
     ).rename("Albedo")
 
-    elevation = ee.Image("USGS/SRTMGL1_003").clip(city_aoi).rename("Elevation")
+    elevation = ee.ImageCollection("COPERNICUS/DEM/GLO30").select('DEM').mosaic().clip(city_aoi).rename("Elevation")
 
     landcover = ee.Image("ESA/WorldCover/v100/2020").clip(city_aoi).rename("LandCover")
 
@@ -73,10 +84,11 @@ def get_spectral(
     features = ndvi.addBands([ndbi, mndwi, savi, albedo, lst, elevation, landcover])
 
     # Create a mask where landcover equals 50 (Urban)
-    urban_mask = landcover.eq(50)
+    # urban_mask = landcover.eq(50)
 
     # Sample ONLY from the urban pixels
-    points = features.updateMask(urban_mask).sample(
+    # points = features.updateMask(urban_mask).sample(
+    points = features.sample(
         region=city_aoi, 
         scale=30, 
         numPixels=200, 
@@ -95,4 +107,4 @@ def get_spectral(
     # Map the function over the FeatureCollection to add the lat/lon properties
     points_with_latlon = points.map(add_latlon)
 
-    geemap.ee_to_csv(points_with_latlon, filename=f"data/{country_code}_UHI_features.csv")
+    geemap.ee_to_csv(points_with_latlon, filename=f"data/{country_code}_spectral_features.csv")

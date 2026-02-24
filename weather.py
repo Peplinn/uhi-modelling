@@ -16,8 +16,7 @@ cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
 retry_session = retry(
     cache_session, 
     retries=5, 
-    backoff_factor=2, 
-    status_forcelist=[429, 500, 502, 503, 504]
+    backoff_factor=2
 )
 openmeteo = openmeteo_requests.Client(session=retry_session)
 
@@ -61,7 +60,8 @@ def fetch_data(lat: int,
             "relative_humidity_2m",
             "precipitation",
             "wind_speed_10m",
-            "cloud_cover_low"
+            "cloud_cover_low",
+            "temperature_2m"
         ]
     }
 
@@ -77,7 +77,7 @@ def fetch_data(lat: int,
     )
 
     data = {"date": time_index}
-    var_names = ["humidity", "precipitation", "wind_speed", "cloud_cover_low"]
+    var_names = ["humidity", "precipitation", "wind_speed", "cloud_cover_low", "air_temperature"]
 
     for i, name in enumerate(var_names):
         data[name] = hourly.Variables(i).ValuesAsNumpy()
@@ -95,10 +95,15 @@ def fetch_data(lat: int,
 
 def process_city_weather(
         country_code: str,
-        date1: str,
-        date2: str):
+        date):
 
-    csv_path = f"data/{country_code}_UHI_features.csv"
+    csv_path = f"data/{country_code}_spectral_features.csv"
+    processed_path = f"data/{country_code}_Full_UHI_Data.csv"
+
+    if os.path.exists(processed_path):
+        print(f"Data has already been processed at {processed_path}.\n")
+        return
+
     if not os.path.exists(csv_path):
         print(f"File {csv_path} not found.")
         return
@@ -108,16 +113,24 @@ def process_city_weather(
     all_weather_data = []
 
     # Iterate through each of the 200 sampled points
+    no_rows = features_df.shape[0]
+
+    if no_rows < 195:
+        print(f"Less than 200 points ({no_rows}) sampled.")
+        return
+
     for index, row in features_df.iterrows():
         lat = row['latitude']
         lng = row['longitude']
 
-        time.sleep(1.0)
+        time.sleep(3.0)
         
-        print(f"Fetching weather for Point {index+1}/200 in {country_code}...")
+        print(f"Fetching weather for Point {index+1}/{no_rows} in {country_code}...")
 
         try:
-            point_weather = fetch_data(lat, lng, date1, date2)
+            point_weather = fetch_data(lat, lng, date[0], date[1])
+
+            print(f"Successfully fetched data for {lat}, {lng}, {date[0]}-{date[1]}")
             
             # Attach the GEE features (NDVI, LST, etc.) to this weather data
             # This links the spatial context to the temporal weather data
@@ -131,5 +144,5 @@ def process_city_weather(
     # Combine all 200 points into one large "Master" dataset for the city
     final_city_df = pd.concat(all_weather_data, ignore_index=True)
     
-    final_city_df.to_csv(f"data/{country_code}_Complete_UHI_Weather.csv", index=False)
-    print(f"Saved complete dataset for {country_code}")
+    final_city_df.to_csv(f"data/{country_code}_Full_UHI_Data.csv", index=False)
+    print(f"Saved complete dataset for {country_code} at data/{country_code}_Full_UHI_Data.csv")
