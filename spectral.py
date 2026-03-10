@@ -8,10 +8,11 @@ import json
 import ee
 import geemap
 import os
+import pandas as pd
 
 def get_spectral(
         country_code: str,
-        city: str,
+        city_name: str,
         date: tuple):
     
     spectral_path = f"data/{country_code}_spectral_features.csv"
@@ -19,13 +20,20 @@ def get_spectral(
     if os.path.exists(spectral_path):
         print(f"Data has already been processed at {spectral_path}.\n")
         return
+    
+    print("Read shapefile...")
 
     country = gpd.read_file(f"data/shapefiles/gadm41_{country_code}_2.shp")
 
-    if country_code != "FIN":
-        city = country[country["NAME_1"] == city]
+    if country_code == "CAN":
+        urban_districts = ["Toronto", "Peel", "York", "Durham", "Halton", "Hamilton", "Waterloo", "Niagara"]
+        city = country[country["NAME_2"].isin(urban_districts)]
+    elif country_code == "IRN":
+        city = country[country["NAME_2"].isin(["Theran", "Rey", "Shemiranat"])]
+    elif country_code == "FIN":
+        city = country[(country["NAME_1"] == "Southern Finland") & (country["NAME_2"] == "Uusimaa")]
     else:
-        city = country[country["NAME_2"] == city]
+        city = country[country["NAME_1"] == city_name]
 
     city_geom = city.unary_union
 
@@ -34,9 +42,10 @@ def get_spectral(
         "geometry"
     ]
 
-    city_aoi = ee.Geometry(city_geojson)
+    city_aoi = ee.Geometry(city_geojson).simplify(maxError=1000)
 
     # Creating the image and adding all the "spectral" bands
+    print("Creating image from date range within shapefile bounds...")
 
     image = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -45,6 +54,8 @@ def get_spectral(
         .median()
         .clip(city_aoi)
     )
+
+    print("Image created.")
 
     ndvi = image.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI")
 
@@ -80,21 +91,34 @@ def get_spectral(
     landcover = ee.Image("ESA/WorldCover/v100/2020").clip(city_aoi).rename("LandCover")
 
     # Merging all the features:
+    print("Merging all the features...")
 
     features = ndvi.addBands([ndbi, mndwi, savi, albedo, lst, elevation, landcover])
+
+    print("Features merged.")
 
     # Create a mask where landcover equals 50 (Urban)
     # urban_mask = landcover.eq(50)
 
     # Sample ONLY from the urban pixels
     # points = features.updateMask(urban_mask).sample(
+    
+
+    num_pixels = 3000 if country_code in ["CAN", "FIN"] else 1000
+
+    num_pixels = 4000 if country_code == "FIN" else 1000
+
+    print(f"Sampling {num_pixels} points...")
+
     points = features.sample(
-        region=city_aoi, 
-        scale=30, 
-        numPixels=200, 
-        geometries=True, 
+        region=city_aoi,
+        scale=30,
+        numPixels=num_pixels,
+        geometries=True,
         seed=50
     )
+
+    print("Sampling done.")
 
 
     def add_latlon(feature):
@@ -103,8 +127,24 @@ def get_spectral(
         lat = coords.get(1)
         return feature.set({"longitude": lon, "latitude": lat})
 
+    print("Adding lat/lon for all the points")
 
     # Map the function over the FeatureCollection to add the lat/lon properties
     points_with_latlon = points.map(add_latlon)
 
+    print("Done adding coordinates")
+
     geemap.ee_to_csv(points_with_latlon, filename=f"data/{country_code}_spectral_features.csv")
+
+    print("Done with EE.")
+
+    df = pd.read_csv(f"data/{country_code}_spectral_features.csv")
+    print("Sampling Urban...")
+    urban = df[df["LandCover"] == 50].sample(n=min(100, len(df[df["LandCover"] == 50])), random_state=42)
+
+    print("Sampling Rural...")
+    rural = df[df["LandCover"] != 50].sample(n=min(100, len(df[df["LandCover"] != 50])), random_state=42)
+
+    print("Concatenating and saving...")
+    pd.concat([urban, rural]).reset_index(drop=True).to_csv(f"data/{country_code}_spectral_features.csv", index=False)
+    print(f"Done. Saved at \"data/{country_code}_spectral_features.csv\"")
