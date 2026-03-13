@@ -20,14 +20,11 @@ def get_spectral(
     if os.path.exists(spectral_path):
         print(f"Data has already been processed at {spectral_path}.\n")
         return
-    
-    print("Read shapefile...")
 
     country = gpd.read_file(f"data/shapefiles/gadm41_{country_code}_2.shp")
 
     if country_code == "CAN":
-        urban_districts = ["Toronto", "Peel", "York", "Durham", "Halton", "Hamilton", "Waterloo", "Niagara"]
-        city = country[country["NAME_2"].isin(urban_districts)]
+        city = country[country["NAME_2"].isin(["Toronto", "Peel", "York", "Durham", "Halton", "Hamilton", "Waterloo", "Niagara"])]
     elif country_code == "IRN":
         city = country[country["NAME_2"].isin(["Theran", "Rey", "Shemiranat"])]
     elif country_code == "FIN":
@@ -36,79 +33,29 @@ def get_spectral(
         city = country[country["NAME_1"] == city_name]
 
     city_geom = city.unary_union
-
-    # Convert to GeoJSON format
-    city_geojson = json.loads(gpd.GeoSeries([city_geom]).to_json())["features"][0][
-        "geometry"
-    ]
-
-    city_aoi = ee.Geometry(city_geojson).simplify(maxError=1000)
-
-    # Creating the image and adding all the "spectral" bands
-    print("Creating image from date range within shapefile bounds...")
+    city_geojson = json.loads(gpd.GeoSeries([city_geom]).to_json())["features"][0]["geometry"]
+    city_aoi = ee.Geometry(city_geojson)
 
     image = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
         .filterBounds(city_aoi)
-        .filterDate(date[0], date[1]) # Make this dynamic
+        .filterDate(date[0], date[1])
         .median()
         .clip(city_aoi)
     )
 
-    print("Image created.")
-
-    ndvi = image.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI")
-
-    # 
-    lst = image.select("ST_B10").multiply(0.00341802).add(149).rename("LST")
-
     ndbi = image.normalizedDifference(["SR_B6", "SR_B5"]).rename("NDBI")
-
     mndwi = image.normalizedDifference(["SR_B3", "SR_B6"]).rename("MNDWI")
-
     savi = image.expression(
         "((NIR - RED) / (NIR + RED + L)) * (1 + L)",
-        {
-            "NIR": image.select("SR_B5"),
-            "RED": image.select("SR_B4"),
-            "L": 0.5,  # soil brightness correction factor
-        },
+        {"NIR": image.select("SR_B5"), "RED": image.select("SR_B4"), "L": 0.5}
     ).rename("SAVI")
-
-    albedo = image.expression(
-        "0.356 * B2 + 0.130 * B4 + 0.373 * B5 + 0.085 * B6 + 0.072 * B7 - 0.0018",
-        {
-            "B2": image.select("SR_B2"),
-            "B4": image.select("SR_B4"),
-            "B5": image.select("SR_B5"),
-            "B6": image.select("SR_B6"),
-            "B7": image.select("SR_B7"),
-        },
-    ).rename("Albedo")
-
     elevation = ee.ImageCollection("COPERNICUS/DEM/GLO30").select('DEM').mosaic().clip(city_aoi).rename("Elevation")
-
     landcover = ee.Image("ESA/WorldCover/v100/2020").clip(city_aoi).rename("LandCover")
 
-    # Merging all the features:
-    print("Merging all the features...")
-
-    features = ndvi.addBands([ndbi, mndwi, savi, albedo, lst, elevation, landcover])
-
-    print("Features merged.")
-
-    # Create a mask where landcover equals 50 (Urban)
-    # urban_mask = landcover.eq(50)
-
-    # Sample ONLY from the urban pixels
-    # points = features.updateMask(urban_mask).sample(
-    
+    features = ndbi.addBands([mndwi, savi, elevation, landcover])
 
     num_pixels = 3000 if country_code in ["CAN", "FIN"] else 1000
-
-    num_pixels = 4000 if country_code == "FIN" else 1000
-
-    print(f"Sampling {num_pixels} points...")
 
     points = features.sample(
         region=city_aoi,
@@ -118,33 +65,108 @@ def get_spectral(
         seed=50
     )
 
-    print("Sampling done.")
-
-
     def add_latlon(feature):
         coords = feature.geometry().coordinates()
-        lon = coords.get(0)
-        lat = coords.get(1)
-        return feature.set({"longitude": lon, "latitude": lat})
+        return feature.set({"longitude": coords.get(0), "latitude": coords.get(1)})
 
-    print("Adding lat/lon for all the points")
-
-    # Map the function over the FeatureCollection to add the lat/lon properties
     points_with_latlon = points.map(add_latlon)
-
-    print("Done adding coordinates")
 
     geemap.ee_to_csv(points_with_latlon, filename=f"data/{country_code}_spectral_features.csv")
 
-    print("Done with EE.")
-
     df = pd.read_csv(f"data/{country_code}_spectral_features.csv")
-    print("Sampling Urban...")
     urban = df[df["LandCover"] == 50].sample(n=min(100, len(df[df["LandCover"] == 50])), random_state=42)
-
-    print("Sampling Rural...")
     rural = df[df["LandCover"] != 50].sample(n=min(100, len(df[df["LandCover"] != 50])), random_state=42)
-
-    print("Concatenating and saving...")
     pd.concat([urban, rural]).reset_index(drop=True).to_csv(f"data/{country_code}_spectral_features.csv", index=False)
-    print(f"Done. Saved at \"data/{country_code}_spectral_features.csv\"")
+    print(f"Saved {country_code} — {len(urban)} urban, {len(rural)} rural pixels.")
+
+
+def get_modis(
+        country_code: str,
+        date: tuple):
+
+    year = pd.Timestamp(date[0]).year
+    modis_path = f"data/{country_code}_modis_features.csv"
+
+    if os.path.exists(modis_path):
+        print(f"MODIS data already exists at {modis_path}.\n")
+        return
+
+    spectral_path = f"data/{country_code}_spectral_features.csv"
+    if not os.path.exists(spectral_path):
+        print(f"Spectral features not found for {country_code}. Run get_spectral first.")
+        return
+
+    pixels = pd.read_csv(spectral_path)[["latitude", "longitude"]].drop_duplicates()
+
+    results = []
+
+    for month in range(1, 13):
+        start = f"{year}-{month:02d}-01"
+        end = (pd.Timestamp(start) + pd.offsets.MonthEnd(1)).strftime("%Y-%m-%d")
+
+        print(f"[{country_code}] Fetching MODIS for month {month}...")
+
+        features = [
+            ee.Feature(
+                ee.Geometry.Point([row["longitude"], row["latitude"]]),
+                {"latitude": row["latitude"], "longitude": row["longitude"]}
+            )
+            for _, row in pixels.iterrows()
+        ]
+        fc = ee.FeatureCollection(features)
+
+        # LST daytime and nighttime from Terra MOD11A1
+        lst_day = (
+            ee.ImageCollection("MODIS/061/MOD11A1")
+            .filterDate(start, end)
+            .select("LST_Day_1km")
+            .mean()
+            .multiply(0.02)  # scale factor
+            .rename("LST_day")
+        )
+
+        lst_night = (
+            ee.ImageCollection("MODIS/061/MOD11A1")
+            .filterDate(start, end)
+            .select("LST_Night_1km")
+            .mean()
+            .multiply(0.02)
+            .rename("LST_night")
+        )
+
+        # NDVI from MOD13A3
+        ndvi = (
+            ee.ImageCollection("MODIS/061/MOD13A3")
+            .filterDate(start, end)
+            .select("1_km_monthly_NDVI")
+            .mean()
+            .multiply(0.0001)  # scale factor
+            .rename("NDVI")
+        )
+
+        # Albedo from MCD43A3
+        albedo = (
+            ee.ImageCollection("MODIS/061/MCD43A3")
+            .filterDate(start, end)
+            .select("Albedo_WSA_shortwave")
+            .mean()
+            .multiply(0.001)  # scale factor
+            .rename("Albedo")
+        )
+
+        combined = lst_day.addBands([lst_night, ndvi, albedo])
+
+        sampled = combined.sampleRegions(
+            collection=fc,
+            properties=["latitude", "longitude"],
+            scale=1000
+        )
+
+        month_data = sampled.getInfo()["features"]
+        for f in month_data:
+            props = f["properties"]
+            props["month"] = month
+            results.append(props)
+
+    pd.DataFrame(results).to_csv(modis_path, index=False)
+    print(f"Saved MODIS features for {country_code}.")
