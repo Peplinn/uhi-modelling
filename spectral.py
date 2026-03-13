@@ -138,7 +138,7 @@ def get_modis(
         ndvi = (
             ee.ImageCollection("MODIS/061/MOD13A3")
             .filterDate(start, end)
-            .select("1_km_monthly_NDVI")
+            .select("NDVI")
             .mean()
             .multiply(0.0001)  # scale factor
             .rename("NDVI")

@@ -123,7 +123,7 @@ def process_city_weather(
         lat = row['latitude']
         lng = row['longitude']
 
-        time.sleep(3.0)
+        time.sleep(3)
         
         print(f"Fetching weather for Point {index+1}/{no_rows} in {country_code}...")
 
