@@ -123,7 +123,6 @@ def get_viirs(
             .filterDate(start, end)
             .select("LST_1KM")
             .mean()
-            .multiply(0.02)
             .rename("LST_day")
         )
 
@@ -133,7 +132,6 @@ def get_viirs(
             .filterDate(start, end)
             .select("LST_1KM")
             .mean()
-            .multiply(0.02)
             .rename("LST_night")
         )
 
