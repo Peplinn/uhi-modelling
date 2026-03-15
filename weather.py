@@ -83,7 +83,7 @@ def fetch_data(lat: int,
         data[name] = hourly.Variables(i).ValuesAsNumpy()
 
     df_full = pd.DataFrame(data)
-    target_hours = [8, 14, 20]
+    target_hours = [1, 13]
     
     df_filtered = df_full[
         (df_full['date'].dt.day == 1) & 
@@ -97,7 +97,7 @@ def process_city_weather(
         country_code: str,
         date):
 
-    csv_path = f"data/{country_code}_spectral_features.csv"
+    csv_path = f"data/{country_code}_sample_points.csv"
     processed_path = f"data/{country_code}_Full_UHI_Data.csv"
 
     if os.path.exists(processed_path):
