@@ -84,7 +84,7 @@ def fetch_data(lat: int,
 
     df_full = pd.DataFrame(data)
     target_hours = [1, 13]
-    
+
     df_filtered = df_full[
         (df_full['date'].dt.day == 1) & 
         (df_full['date'].dt.hour.isin(target_hours))
@@ -109,7 +109,7 @@ def process_city_weather(
         return
 
     features_df = pd.read_csv(csv_path)
-    
+
     all_weather_data = []
 
     # Iterate through each of the 200 sampled points
@@ -124,25 +124,25 @@ def process_city_weather(
         lng = row['longitude']
 
         time.sleep(3)
-        
+
         print(f"Fetching weather for Point {index+1}/{no_rows} in {country_code}...")
 
         try:
             point_weather = fetch_data(lat, lng, date[0], date[1])
 
             print(f"Successfully fetched data for {lat}, {lng}, {date[0]}-{date[1]}")
-            
+
             # Attach the GEE features (NDVI, LST, etc.) to this weather data
             # This links the spatial context to the temporal weather data
             for col in features_df.columns:
                 point_weather[col] = row[col]
-            
+
             all_weather_data.append(point_weather)
         except Exception as e:
             print(f"Error fetching data for {lat}, {lng}: {e}")
 
     # Combine all 200 points into one large "Master" dataset for the city
     final_city_df = pd.concat(all_weather_data, ignore_index=True)
-    
+
     final_city_df.to_csv(f"data/{country_code}_Full_UHI_Data.csv", index=False)
     print(f"Saved complete dataset for {country_code} at data/{country_code}_Full_UHI_Data.csv")
