@@ -1,0 +1,132 @@
+{
+    "Linear Regression": {
+        "SUHI_day": {
+            "R2_train": 0.481,
+            "R2_test": 0.491,
+            "R2_gap": -0.011,
+            "MAE_train": 2.779,
+            "MAE_test": 2.865,
+            "RMSE_test": 3.907
+        },
+        "SUHI_night": {
+            "R2_train": 0.385,
+            "R2_test": 0.402,
+            "R2_gap": -0.017,
+            "MAE_train": 1.748,
+            "MAE_test": 1.893,
+            "RMSE_test": 2.484
+        },
+        "AUHI": {
+            "R2_train": 0.489,
+            "R2_test": 0.513,
+            "R2_gap": -0.025,
+            "MAE_train": 2.484,
+            "MAE_test": 2.487,
+            "RMSE_test": 3.233
+        }
+    },
+    "Ridge Regression": {
+        "SUHI_day": {
+            "R2_train": 0.481,
+            "R2_test": 0.491,
+            "R2_gap": -0.01,
+            "MAE_train": 2.779,
+            "MAE_test": 2.866,
+            "RMSE_test": 3.908
+        },
+        "SUHI_night": {
+            "R2_train": 0.383,
+            "R2_test": 0.401,
+            "R2_gap": -0.019,
+            "MAE_train": 1.746,
+            "MAE_test": 1.891,
+            "RMSE_test": 2.486
+        },
+        "AUHI": {
+            "R2_train": 0.489,
+            "R2_test": 0.513,
+            "R2_gap": -0.025,
+            "MAE_train": 2.484,
+            "MAE_test": 2.487,
+            "RMSE_test": 3.233
+        }
+    },
+    "Random Forest": {
+        "SUHI_day": {
+            "R2_train": 0.98,
+            "R2_test": 0.74,
+            "R2_gap": 0.24,
+            "MAE_train": 0.471,
+            "MAE_test": 1.66,
+            "RMSE_test": 2.793
+        },
+        "SUHI_night": {
+            "R2_train": 0.983,
+            "R2_test": 0.797,
+            "R2_gap": 0.187,
+            "MAE_train": 0.268,
+            "MAE_test": 1.003,
+            "RMSE_test": 1.448
+        },
+        "AUHI": {
+            "R2_train": 0.995,
+            "R2_test": 0.966,
+            "R2_gap": 0.03,
+            "MAE_train": 0.168,
+            "MAE_test": 0.43,
+            "RMSE_test": 0.861
+        }
+    },
+    "Gradient Boosting": {
+        "SUHI_day": {
+            "R2_train": 0.871,
+            "R2_test": 0.729,
+            "R2_gap": 0.142,
+            "MAE_train": 1.33,
+            "MAE_test": 1.832,
+            "RMSE_test": 2.851
+        },
+        "SUHI_night": {
+            "R2_train": 0.882,
+            "R2_test": 0.787,
+            "R2_gap": 0.095,
+            "MAE_train": 0.747,
+            "MAE_test": 1.081,
+            "RMSE_test": 1.484
+        },
+        "AUHI": {
+            "R2_train": 0.985,
+            "R2_test": 0.976,
+            "R2_gap": 0.008,
+            "MAE_train": 0.392,
+            "MAE_test": 0.466,
+            "RMSE_test": 0.713
+        }
+    },
+    "XGBoost": {
+        "SUHI_day": {
+            "R2_train": 0.937,
+            "R2_test": 0.746,
+            "R2_gap": 0.191,
+            "MAE_train": 0.933,
+            "MAE_test": 1.721,
+            "RMSE_test": 2.763
+        },
+        "SUHI_night": {
+            "R2_train": 0.938,
+            "R2_test": 0.798,
+            "R2_gap": 0.141,
+            "MAE_train": 0.54,
+            "MAE_test": 1.035,
+            "RMSE_test": 1.445
+        },
+        "AUHI": {
+            "R2_train": 0.996,
+            "R2_test": 0.987,
+            "R2_gap": 0.009,
+            "MAE_train": 0.197,
+            "MAE_test": 0.312,
+            "RMSE_test": 0.522
+        }
+    }
+}
