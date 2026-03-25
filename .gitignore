@@ -4,3 +4,5 @@
 /__pycache__
 /.cache.sqlite
 /plots
+/models/tuned_random_forest_meta.json
+/models/tuned_random_forest.pkl
