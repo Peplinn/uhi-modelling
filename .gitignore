@@ -6,3 +6,5 @@
 /plots
 /models/tuned_random_forest_meta.json
 /models/tuned_random_forest.pkl
+/models/tuned_random_forest_utfvi_meta.json
+/models/tuned_random_forest_utfvi.pkl
